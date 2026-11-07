@@ -1,8 +1,9 @@
 -- One Hub Loader :)
 
-local game_ids = { 2753915549, 85211729168715, 79091703265657, 4442272183, 7449423635, 100117331123089 }
+local bloxfruit_ids = { 2753915549, 85211729168715, 79091703265657, 4442272183, 7449423635, 100117331123089 }
+local throwfoodforpet_id = 120219252362013
 
-for _, v in ipairs(game_ids) do
+for _, v in ipairs(bloxfruit_ids) do
 	if game.PlaceId == v then
 		local src = game:HttpGet("https://api.luarmor.net/files/v4/loaders/b8cc4d20093305b26fb0e500137d8036.lua")
 		task.spawn(loadstring(src))
@@ -10,8 +11,17 @@ for _, v in ipairs(game_ids) do
 	end
 end
 
+if game.PlaceId == throwfoodforpet_id then
+   local src1 = game:HttpGet("https://raw.githubusercontent.com/pwn653/ThrowFoodForPets/refs/heads/main/script.lua")
+   task.spawn(loadstring(src1))
+   return
+  end
+end
+
+
+
 game:GetService("StarterGui"):SetCore("SendNotification", {
 	Title = "One Hub",
-	Text = "This script only works in Blox Fruits.",
+	Text = "This script is not supported in this game",
 	Duration = 5,
 })

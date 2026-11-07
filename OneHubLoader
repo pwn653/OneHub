@@ -1,9 +1,10 @@
 -- One Hub Loader :)
 
 -- Message for Scriptblox Approvers :
---  this script does NOT require key for field with key = false. 
+--  this script does NOT require a key for games with Key = false.
 
-local DISCORD = "https://discord.gg/yNTHZAJvMd"
+local DISCORD_CODE = "yNTHZAJvMd"
+local DISCORD = "https://discord.gg/" .. DISCORD_CODE
 local GAMES = {
 	{
 		Name = "Blox Fruits",
@@ -20,10 +21,14 @@ local GAMES = {
 	{
 		Name = "Break & Steal Eggs",
 		Ids = { 114326934417838 },
-		Url = "https://api.luarmor.net/files/v4/loaders/199a194373b491edf4f65397786cb509.lua", 
+		Url = "https://api.luarmor.net/files/v4/loaders/199a194373b491edf4f65397786cb509.lua",
 		Key = true,
 	},
 }
+
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
 
 local function notify(text, duration)
 	pcall(function()
@@ -35,23 +40,11 @@ local function notify(text, duration)
 	end)
 end
 
-local function getKey()
-	local k
-	pcall(function()
-		k = (getgenv and getgenv().script_key) or script_key
-	end)
-	k = k and tostring(k) or ""
-	k = k:gsub("^%s+", ""):gsub("%s+$", "")
-	if k == "" or k == "KEY" or k == "YOUR_KEY" or k == "nil" then
-		return nil
-	end
-	return k
-end
-
+-- find this game (place ids only, so a script never runs in the wrong game)
 local current
 for _, g in ipairs(GAMES) do
 	for _, id in ipairs(g.Ids) do
-		if game.PlaceId == id or game.GameId == id then
+		if game.PlaceId == id then
 			current = g
 			break
 		end
@@ -60,19 +53,302 @@ for _, g in ipairs(GAMES) do
 		break
 	end
 end
-
 if not current then
 	notify("This script is not supported in this game")
 	return
 end
 
+---------------------------------------------------------------- keys
+local KEY_FILE = "OneHub/key_" .. (current.Url:match("loaders/(%w+)") or "main") .. ".txt"
+
+local function clean(k)
+	if type(k) == "table" then
+		k = k[current.Name]
+	end
+	k = k and tostring(k) or ""
+	k = k:gsub("^%s+", ""):gsub("%s+$", "")
+	if k == "" or k == "KEY" or k == "YOUR_KEY" or k == "nil" then
+		return nil
+	end
+	return k
+end
+
+local function pastedKey()
+	local k
+	pcall(function()
+		k = (getgenv and getgenv().script_key) or script_key
+	end)
+	return clean(k)
+end
+
+local function savedKey()
+	local k
+	pcall(function()
+		if isfile and isfile(KEY_FILE) then
+			k = readfile(KEY_FILE)
+		end
+	end)
+	return clean(k)
+end
+
+local function saveKey(k)
+	pcall(function()
+		if makefolder and not (isfolder and isfolder("OneHub")) then
+			makefolder("OneHub")
+		end
+		writefile(KEY_FILE, k)
+	end)
+end
+
+-- asks Luarmor if the key works for this script
+local luarmor
+local function checkKey(k)
+	if not luarmor then
+		pcall(function()
+			luarmor = loadstring(game:HttpGet("https://sdkapi-public.luarmor.net/library.lua"))()
+			luarmor.script_id = current.Url:match("loaders/(%w+)")
+		end)
+	end
+	if not luarmor then
+		return true -- can't check right now: let the script itself decide
+	end
+	local ok, res = pcall(luarmor.check_key, k)
+	if not ok or type(res) ~= "table" then
+		return true
+	end
+	local code = res.code
+	if code == "KEY_VALID" then
+		return true
+	elseif code == "KEY_HWID_LOCKED" then
+		return false, "This key is used on another device. Click Reset HWID in our Discord."
+	elseif code == "KEY_EXPIRED" then
+		return false, "This key has expired. Get a new one in our Discord."
+	elseif code == "KEY_BANNED" then
+		return false, "This key is banned."
+	elseif code == "KEY_INCORRECT" or code == "KEY_INVALID" then
+		return false, "Wrong key. Get yours for free in our Discord."
+	end
+	return false, tostring(res.message or code or "Could not check the key, try again.")
+end
+
+-- opens the invite inside the Discord app (and copies the link as a backup)
+local function joinDiscord()
+	pcall(setclipboard, DISCORD)
+	local req = (syn and syn.request) or (http and http.request) or http_request or request or (fluxus and fluxus.request)
+	if req then
+		task.spawn(pcall, req, {
+			Url = "http://127.0.0.1:6463/rpc?v=1",
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json", Origin = "https://discord.com" },
+			Body = HttpService:JSONEncode({
+				cmd = "INVITE_BROWSER",
+				nonce = HttpService:GenerateGUID(false),
+				args = { code = DISCORD_CODE },
+			}),
+		})
+	end
+end
+
+---------------------------------------------------------------- key window
+local function keyWindow(firstMessage)
+	local result
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "OneHubKey"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.DisplayOrder = 999
+	local okParent = pcall(function()
+		gui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+	end)
+	if not okParent or not gui.Parent then
+		gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	end
+
+	local function corner(p, r)
+		local c = Instance.new("UICorner")
+		c.CornerRadius = UDim.new(0, r)
+		c.Parent = p
+	end
+	local function label(parent, text, size, color, font, y, h)
+		local l = Instance.new("TextLabel")
+		l.BackgroundTransparency = 1
+		l.Text = text
+		l.TextSize = size
+		l.TextColor3 = color
+		l.Font = font
+		l.TextWrapped = true
+		l.Size = UDim2.new(1, -40, 0, h)
+		l.Position = UDim2.new(0, 20, 0, y)
+		l.Parent = parent
+		return l
+	end
+
+	local dim = Instance.new("Frame")
+	dim.Size = UDim2.fromScale(1, 1)
+	dim.BackgroundColor3 = Color3.new(0, 0, 0)
+	dim.BackgroundTransparency = 1
+	dim.Parent = gui
+
+	local card = Instance.new("Frame")
+	card.AnchorPoint = Vector2.new(0.5, 0.5)
+	card.Position = UDim2.fromScale(0.5, 0.55)
+	card.Size = UDim2.new(0, 420, 0, 330)
+	card.BackgroundColor3 = Color3.fromRGB(22, 24, 34)
+	card.Parent = gui
+	corner(card, 14)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(88, 101, 242)
+	stroke.Thickness = 2
+	stroke.Parent = card
+	local scale = Instance.new("UIScale")
+	scale.Parent = card
+	-- fits small (phone) screens
+	pcall(function()
+		local vp = workspace.CurrentCamera.ViewportSize
+		scale.Scale = math.min(1, (vp.X - 32) / 420, (vp.Y - 32) / 330)
+	end)
+
+	label(card, "ONE HUB", 26, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBlack, 18, 30)
+	label(card, current.Name .. " needs a free key", 16, Color3.fromRGB(150, 160, 255), Enum.Font.GothamBold, 50, 20)
+	label(
+		card,
+		"1. Join our Discord\n2. Pick " .. current.Name .. " in the script channel\n3. Paste your key below",
+		14,
+		Color3.fromRGB(200, 204, 220),
+		Enum.Font.Gotham,
+		78,
+		60
+	)
+
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(1, -40, 0, 40)
+	box.Position = UDim2.new(0, 20, 0, 148)
+	box.BackgroundColor3 = Color3.fromRGB(32, 35, 50)
+	box.TextColor3 = Color3.fromRGB(255, 255, 255)
+	box.PlaceholderText = "Paste your key here"
+	box.PlaceholderColor3 = Color3.fromRGB(120, 125, 145)
+	box.Font = Enum.Font.GothamMedium
+	box.TextSize = 15
+	box.ClearTextOnFocus = false
+	box.Text = ""
+	box.Parent = card
+	corner(box, 8)
+
+	local status = label(card, firstMessage or "", 13, Color3.fromRGB(255, 120, 120), Enum.Font.GothamMedium, 194, 34)
+
+	local function button(text, color, x, w)
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.new(w, -25, 0, 46)
+		b.Position = UDim2.new(x, x == 0 and 20 or 5, 0, 236)
+		b.BackgroundColor3 = color
+		b.Text = text
+		b.TextColor3 = Color3.new(1, 1, 1)
+		b.Font = Enum.Font.GothamBold
+		b.TextSize = 16
+		b.AutoButtonColor = true
+		b.Parent = card
+		corner(b, 10)
+		return b
+	end
+	local join = button("Join Discord", Color3.fromRGB(88, 101, 242), 0, 0.5)
+	local check = button("Check Key", Color3.fromRGB(46, 160, 90), 0.5, 0.5)
+	label(card, DISCORD, 12, Color3.fromRGB(120, 125, 145), Enum.Font.Gotham, 292, 18)
+
+	local close = Instance.new("TextButton")
+	close.Size = UDim2.new(0, 30, 0, 30)
+	close.Position = UDim2.new(1, -40, 0, 10)
+	close.BackgroundTransparency = 1
+	close.Text = "X"
+	close.TextColor3 = Color3.fromRGB(150, 155, 175)
+	close.Font = Enum.Font.GothamBold
+	close.TextSize = 18
+	close.Parent = card
+
+	-- the Join button pulses so it's the first thing people click
+	task.spawn(function()
+		while gui.Parent do
+			TweenService:Create(join, TweenInfo.new(0.7), { BackgroundColor3 = Color3.fromRGB(120, 132, 255) }):Play()
+			task.wait(0.7)
+			TweenService:Create(join, TweenInfo.new(0.7), { BackgroundColor3 = Color3.fromRGB(88, 101, 242) }):Play()
+			task.wait(0.7)
+		end
+	end)
+
+	TweenService:Create(dim, TweenInfo.new(0.25), { BackgroundTransparency = 0.45 }):Play()
+	TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+
+	local function setStatus(t, good)
+		status.Text = t
+		status.TextColor3 = good and Color3.fromRGB(110, 220, 140) or Color3.fromRGB(255, 120, 120)
+	end
+
+	join.MouseButton1Click:Connect(function()
+		joinDiscord()
+		setStatus("Discord link copied! It should open in your Discord app.", true)
+	end)
+
+	local busy = false
+	check.MouseButton1Click:Connect(function()
+		if busy then
+			return
+		end
+		local k = clean(box.Text)
+		if not k then
+			return setStatus("Paste your key first. Get it for free in our Discord.")
+		end
+		busy = true
+		check.Text = "Checking..."
+		local ok, why = checkKey(k)
+		busy = false
+		check.Text = "Check Key"
+		if ok then
+			setStatus("Key accepted! Loading...", true)
+			result = k
+		else
+			setStatus(why)
+		end
+	end)
+
+	close.MouseButton1Click:Connect(function()
+		result = false
+	end)
+
+	while result == nil and gui.Parent do
+		task.wait(0.1)
+	end
+	if result then
+		task.wait(0.4)
+	end
+	gui:Destroy()
+	return result
+end
+
+---------------------------------------------------------------- key games
 if current.Key then
-	local key = getKey()
+	local key, why = pastedKey(), nil
+	if key then
+		local ok
+		ok, why = checkKey(key)
+		if not ok then
+			key = nil
+		end
+	end
+	if not key then
+		local saved = savedKey()
+		if saved and checkKey(saved) then
+			key = saved
+		end
+	end
+	if not key then
+		key = keyWindow(why)
+	end
 	if not key then
 		pcall(setclipboard, DISCORD)
-		notify("Join our Discord (link copied) and click Get Script in the script channel to use " .. current.Name .. ".", 10)
+		notify("Join our Discord (link copied) to get your free key.", 8)
 		return
 	end
+	saveKey(key) -- remembered, so next time no key is needed
 	-- Luarmor reads the global script_key
 	script_key = key
 	pcall(function()
@@ -80,6 +356,7 @@ if current.Key then
 	end)
 end
 
+---------------------------------------------------------------- load
 local src
 for _ = 1, 3 do
 	local ok, res = pcall(function()

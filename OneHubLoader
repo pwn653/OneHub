@@ -21,7 +21,7 @@ local GAMES = {
 	{
 		Name = "Break & Steal Eggs",
 		Ids = { 114326934417838 },
-		Url = "https://api.luarmor.net/files/v4/loaders/199a194373b491edf4f65397786cb509.lua",
+		Url = "https://api.luarmor.net/files/v4/loaders/4598af20085c79f2a46c4b6759a2dc49.lua",
 		Key = true,
 	},
 }

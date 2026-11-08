@@ -24,6 +24,12 @@ local GAMES = {
 		Url = "https://api.luarmor.net/files/v4/loaders/4598af20085c79f2a46c4b6759a2dc49.lua",
 		Key = true,
 	},
+	{
+		Name = "Steal A Pet And Ride It",
+		Ids = { 95168737547508 },
+		Url = "https://api.luarmor.net/files/v4/loaders/a7d4823ee62a02c4db8643987cc11914.lua", 
+		Key = true,
+	},
 }
 
 local HttpService = game:GetService("HttpService")

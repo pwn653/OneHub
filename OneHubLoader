@@ -25,6 +25,13 @@ local GAMES = {
 		Key = true,
 	},
 	{
+		Name = "King Legacy",
+		-- First Sea, Second Sea, Third Sea
+		Ids = { 4520749081, 6381829480, 15759515082 },
+		Url = "https://api.luarmor.net/files/v4/loaders/66f77872adce5a45d0fe63fd13a96be2.lua",
+		Key = true,
+	},
+	{
 		Name = "Steal A Pet And Ride It",
 		Ids = { 95168737547508 },
 		Url = "https://api.luarmor.net/files/v4/loaders/a7d4823ee62a02c4db8643987cc11914.lua", 

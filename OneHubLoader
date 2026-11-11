@@ -3,8 +3,8 @@
 -- Message for Scriptblox Approvers :
 --  this script does NOT require a key for games with Key = false.
 
-local DISCORD_CODE = "yNTHZAJvMd"
-local DISCORD = "https://discord.gg/" .. DISCORD_CODE
+
+local DISCORD = "https://discord.gg/yNTHZAJvMd"
 local GAMES = {
 	{
 		Name = "Blox Fruits",
@@ -53,7 +53,7 @@ local function notify(text, duration)
 	end)
 end
 
--- find this game (place ids only, so a script never runs in the wrong game)
+
 local current
 for _, g in ipairs(GAMES) do
 	for _, id in ipairs(g.Ids) do
@@ -71,7 +71,7 @@ if not current then
 	return
 end
 
----------------------------------------------------------------- keys
+
 local KEY_FILE = "OneHub/key_" .. (current.Url:match("loaders/(%w+)") or "main") .. ".txt"
 
 local function clean(k)
@@ -113,7 +113,7 @@ local function saveKey(k)
 	end)
 end
 
--- asks Luarmor if the key works for this script
+
 local luarmor
 local function checkKey(k)
 	if not luarmor then
@@ -123,7 +123,7 @@ local function checkKey(k)
 		end)
 	end
 	if not luarmor then
-		return true -- can't check right now: let the script itself decide
+		return true 
 	end
 	local ok, res = pcall(luarmor.check_key, k)
 	if not ok or type(res) ~= "table" then
@@ -144,7 +144,7 @@ local function checkKey(k)
 	return false, tostring(res.message or code or "Could not check the key, try again.")
 end
 
--- opens the invite inside the Discord app (and copies the link as a backup)
+
 local function joinDiscord()
 	pcall(setclipboard, DISCORD)
 	local req = (syn and syn.request) or (http and http.request) or http_request or request or (fluxus and fluxus.request)
@@ -156,13 +156,13 @@ local function joinDiscord()
 			Body = HttpService:JSONEncode({
 				cmd = "INVITE_BROWSER",
 				nonce = HttpService:GenerateGUID(false),
-				args = { code = DISCORD_CODE },
+				args = { code = "yNTHZAJvMd" },
 			}),
 		})
 	end
 end
 
----------------------------------------------------------------- key window
+
 local function keyWindow(firstMessage)
 	local result
 	local gui = Instance.new("ScreenGui")
@@ -278,7 +278,6 @@ local function keyWindow(firstMessage)
 	close.TextSize = 18
 	close.Parent = card
 
-	-- the Join button pulses so it's the first thing people click
 	task.spawn(function()
 		while gui.Parent do
 			TweenService:Create(join, TweenInfo.new(0.7), { BackgroundColor3 = Color3.fromRGB(120, 132, 255) }):Play()
@@ -337,7 +336,7 @@ local function keyWindow(firstMessage)
 	return result
 end
 
----------------------------------------------------------------- key games
+
 if current.Key then
 	local key, why = pastedKey(), nil
 	if key then
@@ -361,15 +360,14 @@ if current.Key then
 		notify("Join our Discord (link copied) to get your free key.", 8)
 		return
 	end
-	saveKey(key) -- remembered, so next time no key is needed
-	-- Luarmor reads the global script_key
+	saveKey(key) 
 	script_key = key
 	pcall(function()
 		getgenv().script_key = key
 	end)
 end
 
----------------------------------------------------------------- load
+
 local src
 for _ = 1, 3 do
 	local ok, res = pcall(function()

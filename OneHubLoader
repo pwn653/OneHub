@@ -26,7 +26,6 @@ local GAMES = {
 	},
 	{
 		Name = "King Legacy",
-		-- First Sea, Second Sea, Third Sea
 		Ids = { 4520749081, 6381829480, 15759515082 },
 		Url = "https://api.luarmor.net/files/v4/loaders/66f77872adce5a45d0fe63fd13a96be2.lua",
 		Key = true,
@@ -74,16 +73,29 @@ end
 
 local KEY_FILE = "OneHub/key_" .. (current.Url:match("loaders/(%w+)") or "main") .. ".txt"
 
+local function looksLikeKey(k)
+	return type(k) == "string" and #k >= 20 and #k <= 64 and k:match("^%w+$") ~= nil
+end
 local function clean(k)
 	if type(k) == "table" then
 		k = k[current.Name]
 	end
 	k = k and tostring(k) or ""
-	k = k:gsub("^%s+", ""):gsub("%s+$", "")
-	if k == "" or k == "KEY" or k == "YOUR_KEY" or k == "nil" then
-		return nil
+	local inQuotes = k:match("script_key%s*=%s*[\"']([^\"']+)[\"']")
+	if inQuotes then
+		k = inQuotes
 	end
-	return k
+	k = k:gsub("%s+", ""):gsub("[\"'`]", "")
+	if looksLikeKey(k) then
+		return k
+	end
+	local best
+	for w in k:gmatch("%w+") do
+		if looksLikeKey(w) and not w:lower():find("http") and (not best or #w > #best) then
+			best = w
+		end
+	end
+	return best
 end
 
 local function pastedKey()
@@ -94,6 +106,18 @@ local function pastedKey()
 	return clean(k)
 end
 
+local function forgetKey()
+	pcall(function()
+		if isfile and isfile(KEY_FILE) then
+			if delfile then
+				delfile(KEY_FILE)
+			else
+				writefile(KEY_FILE, "")
+			end
+		end
+	end)
+end
+
 local function savedKey()
 	local k
 	pcall(function()
@@ -101,7 +125,11 @@ local function savedKey()
 			k = readfile(KEY_FILE)
 		end
 	end)
-	return clean(k)
+	local c = clean(k)
+	if k and k ~= "" and not c then
+		forgetKey() -- a broken saved key would get you kicked every time
+	end
+	return c
 end
 
 local function saveKey(k)
@@ -116,6 +144,9 @@ end
 
 local luarmor
 local function checkKey(k)
+	if not looksLikeKey(k) then
+		return false, "That's not a key. Paste only the key from our Discord.", true
+	end
 	if not luarmor then
 		pcall(function()
 			luarmor = loadstring(game:HttpGet("https://sdkapi-public.luarmor.net/library.lua"))()
@@ -123,11 +154,11 @@ local function checkKey(k)
 		end)
 	end
 	if not luarmor then
-		return true 
+		return false, "Could not check the key, try again.", false
 	end
 	local ok, res = pcall(luarmor.check_key, k)
 	if not ok or type(res) ~= "table" then
-		return true
+		return false, "Could not check the key, try again.", false
 	end
 	local code = res.code
 	if code == "KEY_VALID" then
@@ -141,7 +172,7 @@ local function checkKey(k)
 	elseif code == "KEY_INCORRECT" or code == "KEY_INVALID" then
 		return false, "Wrong key. Get yours for free in our Discord."
 	end
-	return false, tostring(res.message or code or "Could not check the key, try again.")
+	return false, tostring(res.message or code or "Could not check the key, try again."), false
 end
 
 
@@ -216,7 +247,6 @@ local function keyWindow(firstMessage)
 	stroke.Parent = card
 	local scale = Instance.new("UIScale")
 	scale.Parent = card
-	-- fits small (phone) screens
 	pcall(function()
 		local vp = workspace.CurrentCamera.ViewportSize
 		scale.Scale = math.min(1, (vp.X - 32) / 420, (vp.Y - 32) / 330)
@@ -301,6 +331,7 @@ local function keyWindow(firstMessage)
 	end)
 
 	local busy = false
+	local unsure = 0
 	check.MouseButton1Click:Connect(function()
 		if busy then
 			return
@@ -311,10 +342,18 @@ local function keyWindow(firstMessage)
 		end
 		busy = true
 		check.Text = "Checking..."
-		local ok, why = checkKey(k)
+		local ok, why, sure = checkKey(k)
 		busy = false
 		check.Text = "Check Key"
+		-- Luarmor can't be reached: after a few tries, a key that looks right is let through
+		if not ok and sure == false then
+			unsure += 1
+			if unsure >= 3 then
+				ok = true
+			end
+		end
 		if ok then
+			box.Text = k
 			setStatus("Key accepted! Loading...", true)
 			result = k
 		else
@@ -340,16 +379,24 @@ end
 if current.Key then
 	local key, why = pastedKey(), nil
 	if key then
-		local ok
-		ok, why = checkKey(key)
-		if not ok then
+		local ok, sure
+		ok, why, sure = checkKey(key)
+		if not ok and sure ~= false then
 			key = nil
+		elseif not ok then
+			why = nil
 		end
 	end
 	if not key then
 		local saved = savedKey()
-		if saved and checkKey(saved) then
-			key = saved
+		if saved then
+			local ok, w, sure = checkKey(saved)
+			if ok or sure == false then
+				key = saved
+			else
+				forgetKey() 
+				why = why or w
+			end
 		end
 	end
 	if not key then

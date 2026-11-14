@@ -36,6 +36,12 @@ local GAMES = {
 		Url = "https://api.luarmor.net/files/v4/loaders/a7d4823ee62a02c4db8643987cc11914.lua", 
 		Key = true,
 	},
+	{
+		Name = "Jujutsu Shenanigans",
+		Ids = { 9391468976 },
+		Url = "https://api.luarmor.net/files/v4/loaders/PUT_JJS_SCRIPT_ID_HERE.lua",
+		Key = true,
+	},
 }
 
 local HttpService = game:GetService("HttpService")
@@ -127,7 +133,7 @@ local function savedKey()
 	end)
 	local c = clean(k)
 	if k and k ~= "" and not c then
-		forgetKey() -- a broken saved key would get you kicked every time
+		forgetKey() 
 	end
 	return c
 end

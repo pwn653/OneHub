@@ -39,7 +39,7 @@ local GAMES = {
 	{
 		Name = "Jujutsu Shenanigans",
 		Ids = { 9391468976 },
-		Url = "https://api.luarmor.net/files/v4/loaders/7f9449a8b4767ee767aa4e6030c66cff.lua",
+		Url = "https://api.luarmor.net/files/v4/loaders/PUT_JJS_SCRIPT_ID_HERE.lua",
 		Key = true,
 	},
 }
@@ -133,7 +133,7 @@ local function savedKey()
 	end)
 	local c = clean(k)
 	if k and k ~= "" and not c then
-		forgetKey() 
+		forgetKey() -- a broken saved key would get you kicked every time
 	end
 	return c
 end
@@ -202,6 +202,7 @@ end
 
 local function keyWindow(firstMessage)
 	local result
+	local resultVerified = false
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "OneHubKey"
 	gui.ResetOnSpawn = false
@@ -351,6 +352,7 @@ local function keyWindow(firstMessage)
 		local ok, why, sure = checkKey(k)
 		busy = false
 		check.Text = "Check Key"
+		resultVerified = ok
 		-- Luarmor can't be reached: after a few tries, a key that looks right is let through
 		if not ok and sure == false then
 			unsure += 1
@@ -378,42 +380,68 @@ local function keyWindow(firstMessage)
 		task.wait(0.4)
 	end
 	gui:Destroy()
-	return result
+	if not result then
+		return nil, false
+	end
+	return result, resultVerified
 end
 
 
 if current.Key then
-	local key, why = pastedKey(), nil
-	if key then
-		local ok, sure
-		ok, why, sure = checkKey(key)
-		if not ok and sure ~= false then
-			key = nil
-		elseif not ok then
-			why = nil
+	-- A key is only saved once Luarmor says it's valid. A pasted or saved key that Luarmor
+	-- rejects (expired, wrong, banned, other device) is thrown away at once, so it can never
+	-- get stuck and keep failing to load.
+	local function dropPasted()
+		pcall(function()
+			script_key = nil
+			if getgenv then
+				getgenv().script_key = nil
+			end
+		end)
+	end
+	local key, why, unchecked = nil, nil, nil
+	local pasted = pastedKey()
+	if pasted then
+		local ok, w, sure = checkKey(pasted)
+		if ok then
+			key = pasted
+		elseif sure == false then
+			unchecked = pasted
+		else
+			why = w
+			dropPasted()
 		end
 	end
 	if not key then
 		local saved = savedKey()
 		if saved then
 			local ok, w, sure = checkKey(saved)
-			if ok or sure == false then
+			if ok then
 				key = saved
+			elseif sure == false then
+				unchecked = unchecked or saved
 			else
-				forgetKey() 
+				forgetKey()
 				why = why or w
 			end
 		end
 	end
+	local verified = key ~= nil
 	if not key then
-		key = keyWindow(why)
+		key, verified = keyWindow(why or (unchecked and "Could not check your key. Try again." or nil))
 	end
 	if not key then
+		dropPasted()
 		pcall(setclipboard, DISCORD)
 		notify("Join our Discord (link copied) to get your free key.", 8)
 		return
 	end
-	saveKey(key) 
+	if verified then
+		saveKey(key)
+	else
+		-- (Luarmor couldn't be reached: this key is tried once, never saved)
+		forgetKey()
+	end
 	script_key = key
 	pcall(function()
 		getgenv().script_key = key

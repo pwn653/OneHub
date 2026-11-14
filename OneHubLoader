@@ -467,8 +467,10 @@ end
 
 local fn, err = loadstring(src)
 if not fn then
-	notify("The " .. current.Name .. " script failed to load.")
-	warn("[One Hub] " .. tostring(err))
+	-- what the server sent instead of a script (Luarmor puts its reason there)
+	local said = src:gsub("<[^>]*>", " "):gsub("%s+", " "):sub(1, 140)
+	pcall(setclipboard, said)
+	notify("The " .. current.Name .. " script failed to load. Server said: " .. said, 15)
 	return
 end
 task.spawn(fn)

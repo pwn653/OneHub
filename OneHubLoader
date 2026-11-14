@@ -39,7 +39,7 @@ local GAMES = {
 	{
 		Name = "Jujutsu Shenanigans",
 		Ids = { 9391468976 },
-		Url = "https://api.luarmor.net/files/v4/loaders/PUT_JJS_SCRIPT_ID_HERE.lua",
+		Url = "https://api.luarmor.net/files/v4/loaders/7f9449a8b4767ee767aa4e6030c66cff.lua",
 		Key = true,
 	},
 }

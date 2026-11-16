@@ -67,6 +67,12 @@ for _, g in ipairs(GAMES) do
 			break
 		end
 	end
+	for _, id in ipairs(g.GameIds or {}) do
+		if game.GameId == id then
+			current = g
+			break
+		end
+	end
 	if current then
 		break
 	end
@@ -133,7 +139,7 @@ local function savedKey()
 	end)
 	local c = clean(k)
 	if k and k ~= "" and not c then
-		forgetKey() -- a broken saved key would get you kicked every time
+		forgetKey()
 	end
 	return c
 end
@@ -216,12 +222,33 @@ local function keyWindow(firstMessage)
 		gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	end
 
+	-- same look as the hub (Graphite)
+	local C = {
+		Back = Color3.fromHex("#111114"),
+		Card = Color3.fromHex("#18181c"),
+		Field = Color3.fromHex("#121215"),
+		Line = Color3.fromHex("#26262c"),
+		Text = Color3.fromHex("#ededf0"),
+		Muted = Color3.fromHex("#8b8b97"),
+		Accent = Color3.fromHex("#7c3aed"),
+		AccentHi = Color3.fromHex("#8b5cf6"),
+		Good = Color3.fromHex("#4ade80"),
+		Bad = Color3.fromHex("#f87171"),
+	}
 	local function corner(p, r)
 		local c = Instance.new("UICorner")
 		c.CornerRadius = UDim.new(0, r)
 		c.Parent = p
 	end
-	local function label(parent, text, size, color, font, y, h)
+	local function outline(p, color, t)
+		local st = Instance.new("UIStroke")
+		st.Color = color or C.Line
+		st.Transparency = t or 0
+		st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		st.Parent = p
+		return st
+	end
+	local function label(parent, text, size, color, font, x, y, w, h)
 		local l = Instance.new("TextLabel")
 		l.BackgroundTransparency = 1
 		l.Text = text
@@ -229,8 +256,10 @@ local function keyWindow(firstMessage)
 		l.TextColor3 = color
 		l.Font = font
 		l.TextWrapped = true
-		l.Size = UDim2.new(1, -40, 0, h)
-		l.Position = UDim2.new(0, 20, 0, y)
+		l.TextXAlignment = Enum.TextXAlignment.Left
+		l.TextYAlignment = Enum.TextYAlignment.Top
+		l.Size = UDim2.new(w or 1, w and 0 or -x * 2, 0, h)
+		l.Position = UDim2.new(0, x, 0, y)
 		l.Parent = parent
 		return l
 	end
@@ -239,97 +268,174 @@ local function keyWindow(firstMessage)
 	dim.Size = UDim2.fromScale(1, 1)
 	dim.BackgroundColor3 = Color3.new(0, 0, 0)
 	dim.BackgroundTransparency = 1
+	dim.BorderSizePixel = 0
 	dim.Parent = gui
 
-	local card = Instance.new("Frame")
+	local W, H = 420, 370
+	local card = Instance.new("CanvasGroup")
 	card.AnchorPoint = Vector2.new(0.5, 0.5)
-	card.Position = UDim2.fromScale(0.5, 0.55)
-	card.Size = UDim2.new(0, 420, 0, 330)
-	card.BackgroundColor3 = Color3.fromRGB(22, 24, 34)
+	card.Position = UDim2.fromScale(0.5, 0.53)
+	card.Size = UDim2.new(0, W, 0, H)
+	card.BackgroundColor3 = C.Back
+	card.GroupTransparency = 1
 	card.Parent = gui
 	corner(card, 14)
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(88, 101, 242)
-	stroke.Thickness = 2
-	stroke.Parent = card
+	local border = Instance.new("Frame") 
+	border.AnchorPoint = card.AnchorPoint
+	border.Position = card.Position
+	border.Size = card.Size
+	border.BackgroundTransparency = 1
+	border.Parent = gui
+	corner(border, 14)
+	local bStroke = outline(border, C.Line, 1)
 	local scale = Instance.new("UIScale")
 	scale.Parent = card
+	local bScale = Instance.new("UIScale")
+	bScale.Parent = border
+	local fit = 1
 	pcall(function()
 		local vp = workspace.CurrentCamera.ViewportSize
-		scale.Scale = math.min(1, (vp.X - 32) / 420, (vp.Y - 32) / 330)
+		fit = math.min(1, (vp.X - 32) / W, (vp.Y - 32) / H)
 	end)
+	scale.Scale = fit * 0.96
+	bScale.Scale = fit * 0.96
 
-	label(card, "ONE HUB", 26, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBlack, 18, 30)
-	label(card, current.Name .. " needs a free key", 16, Color3.fromRGB(150, 160, 255), Enum.Font.GothamBold, 50, 20)
-	label(
-		card,
-		"1. Join our Discord\n2. Pick " .. current.Name .. " in the script channel\n3. Paste your key below",
-		14,
-		Color3.fromRGB(200, 204, 220),
-		Enum.Font.Gotham,
-		78,
-		60
-	)
 
-	local box = Instance.new("TextBox")
-	box.Size = UDim2.new(1, -40, 0, 40)
-	box.Position = UDim2.new(0, 20, 0, 148)
-	box.BackgroundColor3 = Color3.fromRGB(32, 35, 50)
-	box.TextColor3 = Color3.fromRGB(255, 255, 255)
-	box.PlaceholderText = "Paste your key here"
-	box.PlaceholderColor3 = Color3.fromRGB(120, 125, 145)
-	box.Font = Enum.Font.GothamMedium
-	box.TextSize = 15
-	box.ClearTextOnFocus = false
-	box.Text = ""
-	box.Parent = card
-	corner(box, 8)
-
-	local status = label(card, firstMessage or "", 13, Color3.fromRGB(255, 120, 120), Enum.Font.GothamMedium, 194, 34)
-
-	local function button(text, color, x, w)
-		local b = Instance.new("TextButton")
-		b.Size = UDim2.new(w, -25, 0, 46)
-		b.Position = UDim2.new(x, x == 0 and 20 or 5, 0, 236)
-		b.BackgroundColor3 = color
-		b.Text = text
-		b.TextColor3 = Color3.new(1, 1, 1)
-		b.Font = Enum.Font.GothamBold
-		b.TextSize = 16
-		b.AutoButtonColor = true
-		b.Parent = card
-		corner(b, 10)
-		return b
-	end
-	local join = button("Join Discord", Color3.fromRGB(88, 101, 242), 0, 0.5)
-	local check = button("Check Key", Color3.fromRGB(46, 160, 90), 0.5, 0.5)
-	label(card, DISCORD, 12, Color3.fromRGB(120, 125, 145), Enum.Font.Gotham, 292, 18)
+	local logo = Instance.new("ImageLabel")
+	logo.Size = UDim2.new(0, 30, 0, 30)
+	logo.Position = UDim2.new(0, 16, 0, 13)
+	logo.BackgroundColor3 = C.Accent
+	logo.Image = "rbxassetid://100519548765315"
+	logo.Parent = card
+	corner(logo, 8)
+	label(card, "One Hub", 15, C.Text, Enum.Font.GothamBold, 56, 13, 260, 18)
+	label(card, current.Name, 12, C.Muted, Enum.Font.GothamMedium, 56, 31, 260, 14)
 
 	local close = Instance.new("TextButton")
 	close.Size = UDim2.new(0, 30, 0, 30)
-	close.Position = UDim2.new(1, -40, 0, 10)
+	close.Position = UDim2.new(1, -44, 0, 13)
+	close.BackgroundColor3 = C.Text
 	close.BackgroundTransparency = 1
-	close.Text = "X"
-	close.TextColor3 = Color3.fromRGB(150, 155, 175)
+	close.AutoButtonColor = false
+	close.Text = "✕"
+	close.TextColor3 = C.Muted
 	close.Font = Enum.Font.GothamBold
-	close.TextSize = 18
+	close.TextSize = 14
 	close.Parent = card
+	corner(close, 8)
 
-	task.spawn(function()
-		while gui.Parent do
-			TweenService:Create(join, TweenInfo.new(0.7), { BackgroundColor3 = Color3.fromRGB(120, 132, 255) }):Play()
-			task.wait(0.7)
-			TweenService:Create(join, TweenInfo.new(0.7), { BackgroundColor3 = Color3.fromRGB(88, 101, 242) }):Play()
-			task.wait(0.7)
-		end
+	local line = Instance.new("Frame")
+	line.Size = UDim2.new(1, 0, 0, 1)
+	line.Position = UDim2.new(0, 0, 0, 56)
+	line.BackgroundColor3 = C.Line
+	line.BorderSizePixel = 0
+	line.Parent = card
+
+
+	label(card, "Free key needed", 15, C.Text, Enum.Font.GothamBold, 20, 72, nil, 20)
+	label(card, "Takes a minute, and you only do it once on this device.", 12, C.Muted, Enum.Font.GothamMedium, 20, 94, nil, 16)
+	local steps = {
+		"Join our Discord",
+		"Pick " .. current.Name .. " in the script channel",
+		"Paste your key below",
+	}
+	for i, t in steps do
+		local y = 122 + (i - 1) * 26
+		local dot = Instance.new("TextLabel")
+		dot.Size = UDim2.new(0, 20, 0, 20)
+		dot.Position = UDim2.new(0, 20, 0, y)
+		dot.BackgroundColor3 = C.Accent
+		dot.BackgroundTransparency = 0.8
+		dot.Text = tostring(i)
+		dot.TextColor3 = Color3.fromHex("#c4b5fd")
+		dot.Font = Enum.Font.GothamBold
+		dot.TextSize = 11
+		dot.Parent = card
+		corner(dot, 10)
+		local l = label(card, t, 13, Color3.fromHex("#d4d4da"), Enum.Font.GothamMedium, 50, y + 3, W - 70, 16)
+		l.TextTruncate = Enum.TextTruncate.AtEnd
+		l.TextWrapped = false
+	end
+
+	local field = Instance.new("Frame")
+	field.Size = UDim2.new(1, -40, 0, 40)
+	field.Position = UDim2.new(0, 20, 0, 208)
+	field.BackgroundColor3 = C.Field
+	field.Parent = card
+	corner(field, 9)
+	local fStroke = outline(field, C.Line)
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(1, -24, 1, 0)
+	box.Position = UDim2.new(0, 12, 0, 0)
+	box.BackgroundTransparency = 1
+	box.TextColor3 = C.Text
+	box.PlaceholderText = "Paste your key here"
+	box.PlaceholderColor3 = Color3.fromHex("#5c5c66")
+	box.Font = Enum.Font.Code
+	box.TextSize = 14
+	box.TextXAlignment = Enum.TextXAlignment.Left
+	box.TextTruncate = Enum.TextTruncate.AtEnd
+	box.ClearTextOnFocus = false
+	box.Text = ""
+	box.Parent = field
+	box.Focused:Connect(function()
+		TweenService:Create(fStroke, TweenInfo.new(0.2), { Color = C.Accent }):Play()
+	end)
+	box.FocusLost:Connect(function()
+		TweenService:Create(fStroke, TweenInfo.new(0.2), { Color = C.Line }):Play()
 	end)
 
+	local status = label(card, firstMessage or "", 12, C.Bad, Enum.Font.GothamMedium, 20, 254, nil, 30)
+
+	local function button(text, primary, x)
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.new(0.5, -25, 0, 40)
+		b.Position = UDim2.new(x, x == 0 and 20 or 5, 0, 288)
+		b.BackgroundColor3 = primary and C.Accent or C.Card
+		b.AutoButtonColor = false
+		b.Text = text
+		b.TextColor3 = primary and Color3.new(1, 1, 1) or C.Text
+		b.Font = Enum.Font.GothamBold
+		b.TextSize = 14
+		b.Parent = card
+		corner(b, 9)
+		if not primary then
+			outline(b, C.Line)
+		end
+		local base = b.BackgroundColor3
+		local hover = primary and C.AccentHi or Color3.fromHex("#202026")
+		b.MouseEnter:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.15), { BackgroundColor3 = hover }):Play()
+		end)
+		b.MouseLeave:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.15), { BackgroundColor3 = base }):Play()
+		end)
+		return b
+	end
+	local join = button("Join Discord", false, 0)
+	local check = button("Check Key", true, 0.5)
+	local foot = label(card, DISCORD:gsub("^https://", ""), 11, Color3.fromHex("#5c5c66"), Enum.Font.Code, 20, 342, nil, 14)
+	foot.TextXAlignment = Enum.TextXAlignment.Center
+
+	close.MouseEnter:Connect(function()
+		TweenService:Create(close, TweenInfo.new(0.15), { BackgroundTransparency = 0.93, TextColor3 = C.Text }):Play()
+	end)
+	close.MouseLeave:Connect(function()
+		TweenService:Create(close, TweenInfo.new(0.15), { BackgroundTransparency = 1, TextColor3 = C.Muted }):Play()
+	end)
+
+	-- open: fade in, small grow
+	local open = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	TweenService:Create(dim, TweenInfo.new(0.25), { BackgroundTransparency = 0.45 }):Play()
-	TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+	TweenService:Create(card, open, { Position = UDim2.fromScale(0.5, 0.5), GroupTransparency = 0 }):Play()
+	TweenService:Create(border, open, { Position = UDim2.fromScale(0.5, 0.5) }):Play()
+	TweenService:Create(bStroke, open, { Transparency = 0 }):Play()
+	TweenService:Create(scale, open, { Scale = fit }):Play()
+	TweenService:Create(bScale, open, { Scale = fit }):Play()
 
 	local function setStatus(t, good)
 		status.Text = t
-		status.TextColor3 = good and Color3.fromRGB(110, 220, 140) or Color3.fromRGB(255, 120, 120)
+		status.TextColor3 = good and C.Good or C.Bad
 	end
 
 	join.MouseButton1Click:Connect(function()
@@ -353,7 +459,6 @@ local function keyWindow(firstMessage)
 		busy = false
 		check.Text = "Check Key"
 		resultVerified = ok
-		-- Luarmor can't be reached: after a few tries, a key that looks right is let through
 		if not ok and sure == false then
 			unsure += 1
 			if unsure >= 3 then
@@ -379,6 +484,16 @@ local function keyWindow(firstMessage)
 	if result then
 		task.wait(0.4)
 	end
+	-- close: fade out
+	pcall(function()
+		local shut = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+		TweenService:Create(dim, shut, { BackgroundTransparency = 1 }):Play()
+		TweenService:Create(card, shut, { GroupTransparency = 1 }):Play()
+		TweenService:Create(bStroke, shut, { Transparency = 1 }):Play()
+		TweenService:Create(scale, shut, { Scale = fit * 0.96 }):Play()
+		TweenService:Create(bScale, shut, { Scale = fit * 0.96 }):Play()
+		task.wait(0.2)
+	end)
 	gui:Destroy()
 	if not result then
 		return nil, false
@@ -388,9 +503,6 @@ end
 
 
 if current.Key then
-	-- A key is only saved once Luarmor says it's valid. A pasted or saved key that Luarmor
-	-- rejects (expired, wrong, banned, other device) is thrown away at once, so it can never
-	-- get stuck and keep failing to load.
 	local function dropPasted()
 		pcall(function()
 			script_key = nil
@@ -439,7 +551,6 @@ if current.Key then
 	if verified then
 		saveKey(key)
 	else
-		-- (Luarmor couldn't be reached: this key is tried once, never saved)
 		forgetKey()
 	end
 	script_key = key
@@ -467,7 +578,6 @@ end
 
 local fn, err = loadstring(src)
 if not fn then
-	-- what the server sent instead of a script (Luarmor puts its reason there)
 	local said = src:gsub("<[^>]*>", " "):gsub("%s+", " "):sub(1, 140)
 	pcall(setclipboard, said)
 	notify("The " .. current.Name .. " script failed to load. Server said: " .. said, 15)

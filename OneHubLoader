@@ -42,6 +42,13 @@ local GAMES = {
 		Url = "https://api.luarmor.net/files/v4/loaders/7f9449a8b4767ee767aa4e6030c66cff.lua",
 		Key = true,
 	},
+    {
+		Name = "Anime Adventures",
+		Ids = { 8304191830 },
+		GameIds = { 3183403065 }, 
+		Url = "https://api.luarmor.net/files/v4/loaders/0e32aab72394d55f495ece8cc3f354d8.lua",
+		Key = true,
+	},
 }
 
 local HttpService = game:GetService("HttpService")

@@ -14,7 +14,7 @@ local GAMES = {
 		Name = "Throw Food For Pets",
 		Ids = { 120219252362013 },
 		Url = "https://raw.githubusercontent.com/pwn653/ThrowFoodForPets/refs/heads/main/script.lua",
-		Key = false,
+		Key = true,
 	},
 	{
 		Name = "Break & Steal Eggs",

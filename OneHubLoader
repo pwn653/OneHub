@@ -13,7 +13,7 @@ local GAMES = {
 	{
 		Name = "Throw Food For Pets",
 		Ids = { 120219252362013 },
-		Url = "https://raw.githubusercontent.com/pwn653/ThrowFoodForPets/refs/heads/main/script.lua",
+		Url = "https://api.luarmor.net/files/v4/loaders/199a194373b491edf4f65397786cb509.lua",
 		Key = true,
 	},
 	{

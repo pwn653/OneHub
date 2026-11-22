@@ -1,6 +1,14 @@
 
 
+
 local DISCORD = "https://discord.gg/yNTHZAJvMd"
+local PREMIUM_URL = "https://onehub-script.mysellauth.com/product/one-hub-7-days-key-premium"
+local PREMIUM_PRICE = "" 
+local PAYMENT_METHODS = {
+	{ Badge = "PP", Name = "PayPal" },
+	{ Badge = "CC", Name = "Credit / debit card" },
+	{ Badge = "BTC", Name = "Crypto" },
+}
 
 local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
@@ -105,7 +113,7 @@ local function savedKey()
 	end)
 	local c = clean(k)
 	if k and k ~= "" and not c then
-		forgetKey() 
+		forgetKey()
 	end
 	return c
 end
@@ -201,16 +209,44 @@ local function keyWindow(firstMessage)
 
 	local C = {
 		Back = Color3.fromHex("#111114"),
-		Card = Color3.fromHex("#18181c"),
-		Field = Color3.fromHex("#121215"),
-		Line = Color3.fromHex("#26262c"),
+		Head = Color3.fromHex("#1f1f24"),
+		Card = Color3.fromHex("#16161a"),
+		Field = Color3.fromHex("#0d0d10"),
+		Line = Color3.fromHex("#222228"),
+		Edge = Color3.fromHex("#26262c"),
 		Text = Color3.fromHex("#ededf0"),
-		Muted = Color3.fromHex("#8b8b97"),
+		Soft = Color3.fromHex("#d4d4da"),
+		Muted = Color3.fromHex("#9a9aa6"),
+		Dim = Color3.fromHex("#8b8b97"),
 		Accent = Color3.fromHex("#7c3aed"),
 		AccentHi = Color3.fromHex("#8b5cf6"),
+		Grey = Color3.fromHex("#2a2a31"),
+		GreyHi = Color3.fromHex("#33333b"),
+		Second = Color3.fromHex("#18181c"),
+		Purple = Color3.fromHex("#4c1d95"),
+		Lilac = Color3.fromHex("#ddd6fe"),
+		Chip = Color3.fromHex("#2a2140"),
+		ChipText = Color3.fromHex("#c4b5fd"),
 		Good = Color3.fromHex("#4ade80"),
 		Bad = Color3.fromHex("#f87171"),
 	}
+	local function font(weight)
+		local ok, f = pcall(Font.new, "rbxasset://fonts/families/BuilderSans.json", weight)
+		return ok and f or nil
+	end
+	local F = {
+		Regular = font(Enum.FontWeight.Regular),
+		Medium = font(Enum.FontWeight.Medium),
+		Semi = font(Enum.FontWeight.SemiBold),
+		Bold = font(Enum.FontWeight.Bold),
+	}
+	local function setFont(o, weight)
+		if F[weight] then
+			o.FontFace = F[weight]
+		else
+			o.Font = (weight == "Bold" or weight == "Semi") and Enum.Font.GothamBold or Enum.Font.GothamMedium
+		end
+	end
 	local function corner(p, r)
 		local c = Instance.new("UICorner")
 		c.CornerRadius = UDim.new(0, r)
@@ -218,27 +254,38 @@ local function keyWindow(firstMessage)
 	end
 	local function outline(p, color)
 		local st = Instance.new("UIStroke")
-		st.Color = color or C.Line
+		st.Color = color or C.Edge
 		st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		st.Parent = p
 		return st
 	end
-	local function label(parent, text, size, color, font, x, y, w, h)
+	local function frame(parent, color, x, y, w, h, r)
+		local f = Instance.new("Frame")
+		f.BorderSizePixel = 0
+		f.BackgroundColor3 = color
+		f.Position = UDim2.new(0, x, 0, y)
+		f.Size = UDim2.new(0, w, 0, h)
+		f.Parent = parent
+		if r then
+			corner(f, r)
+		end
+		return f
+	end
+	local function label(parent, text, size, color, weight, x, y, w, h)
 		local l = Instance.new("TextLabel")
 		l.BackgroundTransparency = 1
 		l.Text = text
 		l.TextSize = size
 		l.TextColor3 = color
-		l.Font = font
+		setFont(l, weight)
 		l.TextWrapped = true
 		l.TextXAlignment = Enum.TextXAlignment.Left
-		l.TextYAlignment = Enum.TextYAlignment.Top
+		l.TextYAlignment = Enum.TextYAlignment.Center
 		l.Size = UDim2.new(0, w, 0, h)
 		l.Position = UDim2.new(0, x, 0, y)
 		l.Parent = parent
 		return l
 	end
-
 
 	local vp = Vector2.new(1280, 720)
 	pcall(function()
@@ -252,14 +299,16 @@ local function keyWindow(firstMessage)
 	end)
 	phone = phone or (UIS.TouchEnabled and (not UIS.MouseEnabled or math.min(vp.X, vp.Y) < 600))
 	local mode = not phone and "pc" or (vp.X >= vp.Y and "wide" or "tall")
+	local bh = phone and 46 or 44
 	local W, H
 	if mode == "pc" then
-		W, H = 420, 370
+		W, H = 440, 520
 	elseif mode == "wide" then
-		W, H = math.floor(math.clamp(vp.X - 40, 420, 640)), 246
+		W, H = math.floor(math.clamp(vp.X - 40, 520, 680)), 330
 	else
-		W, H = math.floor(math.clamp(vp.X - 24, 280, 440)), 452
+		W, H = math.floor(math.clamp(vp.X - 24, 300, 440)), 530
 	end
+	local P = 22 
 
 	local dim = Instance.new("Frame")
 	dim.Size = UDim2.fromScale(1, 1)
@@ -274,86 +323,159 @@ local function keyWindow(firstMessage)
 	card.Size = UDim2.new(0, W, 0, H)
 	card.BackgroundColor3 = C.Back
 	card.Active = true
+	card.ClipsDescendants = true
 	card.Parent = gui
-	corner(card, 14)
-	outline(card, C.Line)
+	corner(card, 16)
+	outline(card, C.Edge)
 	local scale = Instance.new("UIScale")
 	scale.Parent = card
 	local fit = math.min(1, (vp.X - 16) / W, (vp.Y - 16) / H)
 	scale.Scale = fit * 0.96
 
+	local function hoverize(b, base, hover)
+		if phone then
+			return
+		end
+		b.MouseEnter:Connect(function()
+			b.BackgroundColor3 = hover
+		end)
+		b.MouseLeave:Connect(function()
+			b.BackgroundColor3 = base
+		end)
+	end
+	local function button(parent, text, kind, x, y, w, h)
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.new(0, w, 0, h or bh)
+		b.Position = UDim2.new(0, x, 0, y)
+		b.AutoButtonColor = false
+		b.Text = text
+		b.TextSize = phone and 15 or 14
+		setFont(b, "Semi")
+		local base, hover
+		if kind == "primary" then
+			base, hover = C.Accent, C.AccentHi
+			b.TextColor3 = Color3.new(1, 1, 1)
+		elseif kind == "grey" then
+			base, hover = C.Grey, C.GreyHi
+			b.TextColor3 = C.Soft
+		else
+			base, hover = C.Second, Color3.fromHex("#202026")
+			b.TextColor3 = C.Text
+			outline(b, Color3.fromHex("#2f2f37"))
+		end
+		b.BackgroundColor3 = base
+		b.Parent = parent
+		corner(b, 10)
+		hoverize(b, base, hover)
+		return b
+	end
+	local function iconButton(parent, text, x)
+		local s = phone and 40 or 32
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.new(0, s, 0, s)
+		b.Position = UDim2.new(0, x, 0, (60 - s) / 2)
+		b.BackgroundColor3 = C.Text
+		b.BackgroundTransparency = 1
+		b.AutoButtonColor = false
+		b.Text = text
+		b.TextColor3 = C.Dim
+		b.TextSize = 15
+		setFont(b, "Bold")
+		b.Parent = parent
+		corner(b, 8)
+		if not phone then
+			b.MouseEnter:Connect(function()
+				b.BackgroundTransparency = 0.93
+				b.TextColor3 = C.Text
+			end)
+			b.MouseLeave:Connect(function()
+				b.BackgroundTransparency = 1
+				b.TextColor3 = C.Dim
+			end)
+		end
+		return b, s
+	end
+	local function page()
+		local p = Instance.new("Frame")
+		p.BackgroundTransparency = 1
+		p.Size = UDim2.fromScale(1, 1)
+		p.Parent = card
+		return p
+	end
+	local function header(p, title, sub, withBack)
+		frame(p, C.Head, 0, 59, W, 1)
+		local x = 18
+		local back
+		if withBack then
+			back = iconButton(p, "‹", 10)
+			back.TextSize = 24
+			x = 10 + (phone and 40 or 32) + 8
+		else
+			local logo = Instance.new("ImageLabel")
+			logo.Size = UDim2.new(0, 32, 0, 32)
+			logo.Position = UDim2.new(0, 18, 0, 14)
+			logo.BackgroundColor3 = C.Accent
+			logo.BorderSizePixel = 0
+			logo.Image = "rbxassetid://100519548765315"
+			logo.Parent = p
+			corner(logo, 9)
+			x = 62
+		end
+		if sub then
+			label(p, title, 14, C.Text, "Semi", x, 12, W - x - 60, 18)
+			label(p, sub, 12, C.Dim, "Medium", x, 30, W - x - 60, 16)
+		else
+			label(p, title, 14, C.Text, "Semi", x, 20, W - x - 60, 20)
+		end
+		local cs = phone and 40 or 32
+		local close = iconButton(p, "✕", W - cs - 12)
+		close.MouseButton1Click:Connect(function()
+			result = false
+		end)
+		return back
+	end
 
-	local logo = Instance.new("ImageLabel")
-	logo.Size = UDim2.new(0, 30, 0, 30)
-	logo.Position = UDim2.new(0, 16, 0, 13)
-	logo.BackgroundColor3 = C.Accent
-	logo.Image = "rbxassetid://100519548765315"
-	logo.Parent = card
-	corner(logo, 8)
-	label(card, "One Hub", 15, C.Text, Enum.Font.GothamBold, 56, 13, W - 120, 18)
-	label(card, current.Name, 12, C.Muted, Enum.Font.GothamMedium, 56, 31, W - 120, 14)
-
-	local close = Instance.new("TextButton")
-	local cs = phone and 40 or 30
-	close.Size = UDim2.new(0, cs, 0, cs)
-	close.Position = UDim2.new(1, -cs - 10, 0, (56 - cs) / 2)
-	close.BackgroundColor3 = C.Text
-	close.BackgroundTransparency = 1
-	close.AutoButtonColor = false
-	close.Text = "✕"
-	close.TextColor3 = C.Muted
-	close.Font = Enum.Font.GothamBold
-	close.TextSize = 14
-	close.Parent = card
-	corner(close, 8)
-
-	local line = Instance.new("Frame")
-	line.Size = UDim2.new(1, 0, 0, 1)
-	line.Position = UDim2.new(0, 0, 0, 56)
-	line.BackgroundColor3 = C.Line
-	line.BorderSizePixel = 0
-	line.Parent = card
-
-
-	local colW = mode == "wide" and math.floor((W - 60) / 2) or (W - 40)
-	label(card, "Free key needed", 15, C.Text, Enum.Font.GothamBold, 20, 72, colW, 20)
-	label(card, mode == "pc" and "Takes a minute, and you only do it once on this device." or "Takes a minute, once per device.", 12, C.Muted, Enum.Font.GothamMedium, 20, 94, colW, 16)
-	local steps = {
+	local keyPage = page()
+	header(keyPage, "One Hub", current.Name, false)
+	local wide = mode == "wide"
+	local colW = wide and math.floor((W - P * 2 - 20) / 2) or (W - P * 2)
+	local lx, rx = P, wide and (P + colW + 20) or P
+	local y = 82
+	label(keyPage, "Get your free key", 20, C.Text, "Bold", lx, y, colW, 24)
+	label(keyPage, mode == "pc" and "Takes a minute. You only do it once on this device." or "Takes a minute, once per device.", 13, C.Muted, "Medium", lx, y + 28, colW, 18)
+	local steps = frame(keyPage, C.Card, lx, y + 58, colW, 122, 12)
+	outline(steps, C.Line)
+	local texts = {
 		"Join our Discord",
 		"Pick " .. current.Name .. " in the script channel",
-		"Paste your key " .. (mode == "wide" and "here" or "below"),
+		"Paste your key " .. (wide and "here" or "below"),
 	}
-	for i, t in steps do
-		local y = 122 + (i - 1) * 26
+	for i, t in texts do
+		local sy = (i - 1) * 41
+		if i > 1 then
+			frame(steps, C.Line, 46, sy, colW - 46, 1)
+		end
 		local dot = Instance.new("TextLabel")
 		dot.Size = UDim2.new(0, 20, 0, 20)
-		dot.Position = UDim2.new(0, 20, 0, y)
-		dot.BackgroundColor3 = C.Accent
-		dot.BackgroundTransparency = 0.8
+		dot.Position = UDim2.new(0, 14, 0, sy + 10)
+		dot.BackgroundColor3 = C.Chip
+		dot.BorderSizePixel = 0
 		dot.Text = tostring(i)
-		dot.TextColor3 = Color3.fromHex("#c4b5fd")
-		dot.Font = Enum.Font.GothamBold
+		dot.TextColor3 = C.ChipText
 		dot.TextSize = 11
-		dot.Parent = card
+		setFont(dot, "Bold")
+		dot.Parent = steps
 		corner(dot, 10)
-		local l = label(card, t, 13, Color3.fromHex("#d4d4da"), Enum.Font.GothamMedium, 50, y + 3, colW - 30, 16)
-		l.TextTruncate = Enum.TextTruncate.AtEnd
+		local l = label(steps, t, 13, C.Soft, "Medium", 46, sy, colW - 58, 40)
 		l.TextWrapped = false
+		l.TextTruncate = Enum.TextTruncate.AtEnd
 	end
 
-
-	local fx, fy, fw = 20, 208, W - 40
-	if mode == "wide" then
-		fx, fy, fw = 40 + colW, 72, colW
-	end
-	local fh = phone and 46 or 40
-	local field = Instance.new("Frame")
-	field.Size = UDim2.new(0, fw, 0, fh)
-	field.Position = UDim2.new(0, fx, 0, fy)
-	field.BackgroundColor3 = C.Field
-	field.Parent = card
-	corner(field, 9)
-	local fStroke = outline(field, C.Line)
+	local ky = wide and 82 or (y + 58 + 122 + 18)
+	label(keyPage, "Key", 12, C.Muted, "Medium", rx, ky, colW, 16)
+	local fh = phone and 46 or 44
+	local field = frame(keyPage, C.Field, rx, ky + 22, colW, fh, 10)
+	local fStroke = outline(field, Color3.fromHex("#2a2a31"))
 	local box = Instance.new("TextBox")
 	box.Size = UDim2.new(1, -24, 1, 0)
 	box.Position = UDim2.new(0, 12, 0, 0)
@@ -372,61 +494,118 @@ local function keyWindow(firstMessage)
 		fStroke.Color = C.Accent
 	end)
 	box.FocusLost:Connect(function()
-		fStroke.Color = C.Line
+		fStroke.Color = Color3.fromHex("#2a2a31")
+	end)
+	local sy = ky + 22 + fh + 6
+	local status = label(keyPage, firstMessage or "", 12, C.Bad, "Medium", rx, sy, colW, 16)
+	status.TextTruncate = Enum.TextTruncate.AtEnd
+	status.TextWrapped = false
+	local by = sy + 22
+	local half = math.floor((colW - 10) / 2)
+	local join = button(keyPage, "Join Discord", "second", rx, by, half)
+	local check = button(keyPage, "Check Key", "primary", rx + half + 10, by, colW - half - 10)
+	local dy = by + bh + 14
+	frame(keyPage, C.Line, rx, dy + 7, colW, 1)
+	local orText = label(keyPage, "  or skip the key with Premium  ", 11, C.Dim, "Medium", rx, dy, colW, 14)
+	orText.TextXAlignment = Enum.TextXAlignment.Center
+	orText.AutomaticSize = Enum.AutomaticSize.None
+	local orBack = frame(keyPage, C.Back, rx + math.floor(colW / 2) - 92, dy, 184, 14)
+	orBack.ZIndex = 1
+	orText.ZIndex = 2
+	local skip = button(keyPage, "Skip", "grey", rx, dy + 26, colW)
+
+	local premPage = page()
+	premPage.Visible = false
+	local back = header(premPage, "One Hub Premium", nil, true)
+	local py = 80
+	local pw = wide and colW or (W - P * 2)
+	local banner = frame(premPage, C.Purple, P, py, pw, 78, 12)
+	banner.ClipsDescendants = true
+	local ring = frame(banner, Color3.new(0, 0, 0), pw - 120, -60, 170, 170)
+	ring.BackgroundTransparency = 1
+	Instance.new("UICorner", ring).CornerRadius = UDim.new(1, 0)
+	outline(ring, Color3.fromHex("#6d3fc4"))
+	local emblem = frame(banner, C.Accent, 16, 17, 44, 44, 12)
+	outline(emblem, Color3.fromHex("#a78bfa"))
+	local crown = Instance.new("ImageLabel")
+	crown.BackgroundTransparency = 1
+	crown.Image = "rbxassetid://127843403295538"
+	crown.ImageColor3 = Color3.new(1, 1, 1)
+	crown.AnchorPoint = Vector2.new(0.5, 0.5)
+	crown.Position = UDim2.fromScale(0.5, 0.5)
+	crown.Size = UDim2.new(0, 22, 0, 22)
+	crown.Parent = emblem
+	local priceW = PREMIUM_PRICE ~= "" and 70 or 0
+	label(banner, "No key, every game", 16, Color3.new(1, 1, 1), "Bold", 74, 18, pw - 74 - 16 - priceW, 20)
+	local sub = label(banner, "Skip key checkpoints and get new features first.", 12, C.Lilac, "Medium", 74, 40, pw - 74 - 16 - priceW, 28)
+	sub.TextYAlignment = Enum.TextYAlignment.Top
+	if PREMIUM_PRICE ~= "" then
+		local pr = label(banner, PREMIUM_PRICE, 18, Color3.new(1, 1, 1), "Bold", pw - 16 - priceW, 20, priceW, 22)
+		pr.TextXAlignment = Enum.TextXAlignment.Right
+		local per = label(banner, "7 days", 11, C.Lilac, "Medium", pw - 16 - priceW, 42, priceW, 14)
+		per.TextXAlignment = Enum.TextXAlignment.Right
+	end
+	local mx = wide and (P + colW + 20) or P
+	local my = wide and 80 or (py + 78 + 16)
+	label(premPage, "Pay with", 12, C.Muted, "Medium", mx, my, pw, 16)
+	local list = frame(premPage, C.Card, mx, my + 22, pw, #PAYMENT_METHODS * 48, 12)
+	outline(list, C.Line)
+	local premStatus
+	local function copyStore(how)
+		pcall(setclipboard, PREMIUM_URL)
+		premStatus.Text = "Store link copied. Open it in your browser" .. (how and (" and pick " .. how) or "") .. "."
+		premStatus.TextColor3 = C.Good
+	end
+	for i, m in PAYMENT_METHODS do
+		local ry = (i - 1) * 48
+		if i > 1 then
+			frame(list, C.Line, 0, ry, pw, 1)
+		end
+		local row = Instance.new("TextButton")
+		row.BackgroundColor3 = C.Card
+		row.BackgroundTransparency = 1
+		row.AutoButtonColor = false
+		row.Text = ""
+		row.Size = UDim2.new(1, 0, 0, 48)
+		row.Position = UDim2.new(0, 0, 0, ry)
+		row.Parent = list
+		local badge = label(row, m.Badge, 11, Color3.fromHex("#c8c8d0"), "Bold", 14, 9, 30, 30)
+		badge.BackgroundTransparency = 0
+		badge.BackgroundColor3 = Color3.fromHex("#222228")
+		badge.TextXAlignment = Enum.TextXAlignment.Center
+		corner(badge, 8)
+		label(row, m.Name, 13, C.Text, "Semi", 56, 0, pw - 90, 48)
+		local arrow = label(row, "›", 18, Color3.fromHex("#6b6b76"), "Medium", pw - 28, 0, 14, 48)
+		arrow.TextXAlignment = Enum.TextXAlignment.Center
+		row.MouseButton1Click:Connect(function()
+			copyStore(m.Name)
+		end)
+		if not phone then
+			row.MouseEnter:Connect(function()
+				row.BackgroundTransparency = 0
+				row.BackgroundColor3 = Color3.fromHex("#1c1c21")
+			end)
+			row.MouseLeave:Connect(function()
+				row.BackgroundTransparency = 1
+			end)
+		end
+	end
+	local cy = my + 22 + #PAYMENT_METHODS * 48 + 16
+	local copyBtn = button(premPage, "Copy store link", "primary", mx, cy, pw)
+	premStatus = label(premPage, "Open it in your browser to pay. Your key arrives right after.", 11, C.Dim, "Medium", wide and P or mx, wide and (py + 78 + 14) or (cy + bh + 8), pw, wide and 30 or 16)
+	premStatus.TextXAlignment = wide and Enum.TextXAlignment.Left or Enum.TextXAlignment.Center
+	copyBtn.MouseButton1Click:Connect(function()
+		copyStore(nil)
 	end)
 
-	local status = label(card, firstMessage or "", 12, C.Bad, Enum.Font.GothamMedium, fx, fy + fh + 6, fw, 30)
-
-	local bh = phone and 46 or 40
-	local function button(text, primary, i)
-		local b = Instance.new("TextButton")
-		if mode == "tall" then
-			b.Size = UDim2.new(0, fw, 0, bh)
-			b.Position = UDim2.new(0, fx, 0, fy + fh + 40 + (primary and 0 or bh + 8))
-		else
-			local half = math.floor((fw - 10) / 2)
-			b.Size = UDim2.new(0, half, 0, bh)
-			b.Position = UDim2.new(0, fx + (primary and half + 10 or 0), 0, fy + fh + 40)
-		end
-		b.BackgroundColor3 = primary and C.Accent or C.Card
-		b.AutoButtonColor = false
-		b.Text = text
-		b.TextColor3 = primary and Color3.new(1, 1, 1) or C.Text
-		b.Font = Enum.Font.GothamBold
-		b.TextSize = phone and 15 or 14
-		b.Parent = card
-		corner(b, 9)
-		if not primary then
-			outline(b, C.Line)
-		end
-		if not phone then
-			local base = b.BackgroundColor3
-			local hover = primary and C.AccentHi or Color3.fromHex("#202026")
-			b.MouseEnter:Connect(function()
-				b.BackgroundColor3 = hover
-			end)
-			b.MouseLeave:Connect(function()
-				b.BackgroundColor3 = base
-			end)
-		end
-		return b
-	end
-	local join = button("Join Discord", false)
-	local check = button("Check Key", true)
-	local footY = mode == "tall" and (fy + fh + 40 + bh * 2 + 8 + 12) or (fy + fh + 40 + bh + 12)
-	local foot = label(card, (DISCORD:gsub("^https://", "")), 11, Color3.fromHex("#5c5c66"), Enum.Font.Code, fx, footY, fw, 14)
-	foot.TextXAlignment = Enum.TextXAlignment.Center
-
-	if not phone then
-		close.MouseEnter:Connect(function()
-			close.BackgroundTransparency = 0.93
-			close.TextColor3 = C.Text
-		end)
-		close.MouseLeave:Connect(function()
-			close.BackgroundTransparency = 1
-			close.TextColor3 = C.Muted
-		end)
-	end
+	skip.MouseButton1Click:Connect(function()
+		keyPage.Visible = false
+		premPage.Visible = true
+	end)
+	back.MouseButton1Click:Connect(function()
+		premPage.Visible = false
+		keyPage.Visible = true
+	end)
 
 	local open = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	TweenService:Create(dim, TweenInfo.new(0.25), { BackgroundTransparency = 0.45 }):Play()
@@ -436,6 +615,10 @@ local function keyWindow(firstMessage)
 	local function setStatus(t, good)
 		status.Text = t
 		status.TextColor3 = good and C.Good or C.Bad
+		fStroke.Color = (t ~= "" and not good) and Color3.fromHex("#7f2d2d") or Color3.fromHex("#2a2a31")
+	end
+	if firstMessage then
+		setStatus(firstMessage)
 	end
 
 	join.MouseButton1Click:Connect(function()
@@ -472,10 +655,6 @@ local function keyWindow(firstMessage)
 		else
 			setStatus(why)
 		end
-	end)
-
-	close.MouseButton1Click:Connect(function()
-		result = false
 	end)
 
 	while result == nil and gui.Parent do

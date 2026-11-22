@@ -16,8 +16,6 @@ local PAYMENT_METHODS = {
         Name = 'Crypto',
     },
 }
-
--- hello world
 local HttpService = game:GetService('HttpService')
 local TweenService = game:GetService('TweenService')
 local Players = game:GetService('Players')
@@ -226,23 +224,467 @@ local function joinDiscord()
         })
     end
 end
-local function openLink(url)
-    local ways = {
-        function()
-            game:GetService('LinkingService'):OpenUrl(url)
-        end,
-        function()
-            game:GetService('GuiService'):OpenBrowserWindow(url)
-        end,
+local function qrMatrix(text)
+    local ECC = {
+        10,
+        16,
+        26,
+        18,
+        24,
+        16,
+        18,
+        22,
+        22,
+        26,
+    }
+    local BLOCKS = {
+        1,
+        1,
+        1,
+        2,
+        2,
+        4,
+        4,
+        4,
+        5,
+        5,
     }
 
-    for _, way in ways do
-        if pcall(way) then
-            return true
+    local function rawModules(v)
+        local r = (16 * v + 128) * v + 64
+
+        if v >= 2 then
+            local n = v // 7 + 2
+
+            r -= (25 * n - 10) * n - 55
+
+            if v >= 7 then
+                r -= 36
+            end
+        end
+
+        return r
+    end
+    local function dataCodewords(v)
+        return rawModules(v) // 8 - ECC[v] * BLOCKS[v]
+    end
+
+    local ver
+
+    for v = 1, 10 do
+        local cap = dataCodewords(v) * 8
+        local need = 4 + (v <= 9 and 8 or 16) + #text * 8
+
+        if need <= cap then
+            ver = v
+
+            break
         end
     end
 
-    return false
+    if not ver then
+        return nil
+    end
+
+    local bits = {}
+
+    local function put(val, n)
+        for i = n - 1, 0, -1 do
+            bits[#bits + 1] = bit32.band(bit32.rshift(val, i), 1)
+        end
+    end
+
+    put(4, 4)
+    put(#text, ver <= 9 and 8 or 16)
+
+    for i = 1, #text do
+        put(string.byte(text, i), 8)
+    end
+
+    local cap = dataCodewords(ver) * 8
+
+    put(0, math.min(4, cap - #bits))
+    put(0, (8 - #bits % 8) % 8)
+
+    local data = {}
+
+    for i = 1, #bits, 8 do
+        local b = 0
+
+        for j = 0, 7 do
+            b = b * 2 + bits[i + j]
+        end
+
+        data[#data + 1] = b
+    end
+
+    local pad = 0xec
+
+    while#data < dataCodewords(ver) do
+        data[#data + 1] = pad
+        pad = pad == 0xec and 0x11 or 0xec
+    end
+
+    local function mul(x, y)
+        local z = 0
+
+        for i = 7, 0, -1 do
+            z = bit32.bxor(bit32.lshift(z, 1), bit32.rshift(z, 7) * 0x11d)
+            z = bit32.bxor(z, bit32.band(bit32.rshift(y, i), 1) * x)
+        end
+
+        return bit32.band(z, 0xff)
+    end
+
+    local deg = ECC[ver]
+    local div = {}
+
+    for i = 1, deg - 1 do
+        div[i] = 0
+    end
+
+    div[deg] = 1
+
+    local root = 1
+
+    for _ = 1, deg do
+        for j = 1, deg do
+            div[j] = mul(div[j], root)
+
+            if j < deg then
+                div[j] = bit32.bxor(div[j], div[j + 1])
+            end
+        end
+
+        root = mul(root, 0x2)
+    end
+
+    local function remainder(block)
+        local res = {}
+
+        for i = 1, deg do
+            res[i] = 0
+        end
+
+        for _, b in block do
+            local f = bit32.bxor(b, res[1])
+
+            table.remove(res, 1)
+
+            res[deg] = 0
+
+            for i = 1, deg do
+                res[i] = bit32.bxor(res[i], mul(div[i], f))
+            end
+        end
+
+        return res
+    end
+
+    local nb = BLOCKS[ver]
+    local raw = rawModules(ver) // 8
+    local numShort = nb - raw % nb
+    local shortLen = raw // nb
+    local blocks = {}
+    local k = 1
+
+    for i = 0, nb - 1 do
+        local len = shortLen - deg + (i < numShort and 0 or 1)
+        local dat = {}
+
+        for _ = 1, len do
+            dat[#dat + 1] = data[k]
+
+            k += 1
+        end
+
+        local ecc = remainder(dat)
+        local full = {}
+
+        for _, b in dat do
+            full[#full + 1] = b
+        end
+
+        if i < numShort then
+            full[#full + 1] = false
+        end
+
+        for _, b in ecc do
+            full[#full + 1] = b
+        end
+
+        blocks[#blocks + 1] = full
+    end
+
+    local final = {}
+
+    for i = 1, #blocks[1]do
+        for j, b in blocks do
+            if b[i] ~= false and b[i] ~= nil then
+                final[#final + 1] = b[i]
+            end
+        end
+    end
+
+    local size = ver * 4 + 17
+    local m, fn = {}, {}
+
+    for y = 0, size - 1 do
+        m[y] = {}
+        fn[y] = {}
+
+        for x = 0, size - 1 do
+            m[y][x] = false
+            fn[y][x] = false
+        end
+    end
+
+    local function set(x, y, dark)
+        m[y][x] = dark
+        fn[y][x] = true
+    end
+
+    for i = 0, size - 1 do
+        set(6, i, i % 2 == 0)
+        set(i, 6, i % 2 == 0)
+    end
+
+    local function finder(cx, cy)
+        for dy = -4, 4 do
+            for dx = -4, 4 do
+                local d = math.max(math.abs(dx), math.abs(dy))
+                local x, y = cx + dx, cy + dy
+
+                if x >= 0 and x < size and y >= 0 and y < size then
+                    set(x, y, d ~= 2 and d ~= 4)
+                end
+            end
+        end
+    end
+
+    finder(3, 3)
+    finder(size - 4, 3)
+    finder(3, size - 4)
+
+    if ver > 1 then
+        local n = ver // 7 + 2
+        local step = (ver * 8 + n * 3 + 5) // (n * 4 - 4) * 2
+        local pos = {6}
+
+        for i = n - 2, 0, -1 do
+            pos[#pos + 1] = size - 7 - i * step
+        end
+        for i = 1, n do
+            for j = 1, n do
+                if not ((i == 1 and j == 1) or (i == 1 and j == n) or (i == n and j == 1)) then
+                    for dy = -2, 2 do
+                        for dx = -2, 2 do
+                            set(pos[i] + dx, pos[j] + dy, math.max(math.abs(dx), math.abs(dy)) ~= 1)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    local function drawFormat(mask)
+        local d = bit32.bor(0, mask)
+        local rem = d
+
+        for _ = 1, 10 do
+            rem = bit32.bxor(bit32.lshift(rem, 1), bit32.rshift(rem, 9) * 0x537)
+        end
+
+        local b = bit32.bxor(bit32.bor(bit32.lshift(d, 10), rem), 0x5412)
+
+        local function bitAt(i)
+            return bit32.band(bit32.rshift(b, i), 1) == 1
+        end
+
+        for i = 0, 5 do
+            set(8, i, bitAt(i))
+        end
+
+        set(8, 7, bitAt(6))
+        set(8, 8, bitAt(7))
+        set(7, 8, bitAt(8))
+
+        for i = 9, 14 do
+            set(14 - i, 8, bitAt(i))
+        end
+        for i = 0, 7 do
+            set(size - 1 - i, 8, bitAt(i))
+        end
+        for i = 8, 14 do
+            set(8, size - 15 + i, bitAt(i))
+        end
+
+        set(8, size - 8, true)
+    end
+
+    drawFormat(0)
+
+    if ver >= 7 then
+        local rem = ver
+
+        for _ = 1, 12 do
+            rem = bit32.bxor(bit32.lshift(rem, 1), bit32.rshift(rem, 11) * 0x1f25)
+        end
+
+        local b = bit32.bor(bit32.lshift(ver, 12), rem)
+
+        for i = 0, 17 do
+            local dark = bit32.band(bit32.rshift(b, i), 1) == 1
+            local a, c = size - 11 + i % 3, i // 3
+
+            set(a, c, dark)
+            set(c, a, dark)
+        end
+    end
+
+    local i = 0
+    local total = #final * 8
+    local right = size - 1
+
+    while right >= 1 do
+        if right == 6 then
+            right = 5
+        end
+
+        for vert = 0, size - 1 do
+            for j = 0, 1 do
+                local x = right - j
+                local upward = ((right + 1) // 2) % 2 == 0
+                local y = upward and (size - 1 - vert) or vert
+
+                if not fn[y][x] and i < total then
+                    local byte = final[i // 8 + 1]
+
+                    m[y][x] = bit32.band(bit32.rshift(byte, 7 - i % 8), 1) == 1
+
+                    i += 1
+                end
+            end
+        end
+
+        right -= 2
+    end
+
+    local MASKS = {
+        function(x, y)
+            return (x + y) % 2 == 0
+        end,
+        function(x, y)
+            return y % 2 == 0
+        end,
+        function(x, y)
+            return x % 3 == 0
+        end,
+        function(x, y)
+            return (x + y) % 3 == 0
+        end,
+        function(x, y)
+            return (x // 3 + y // 2) % 2 == 0
+        end,
+        function(x, y)
+            return x * y % 2 + x * y % 3 == 0
+        end,
+        function(x, y)
+            return (x * y % 2 + x * y % 3) % 2 == 0
+        end,
+        function(x, y)
+            return ((x + y) % 2 + x * y % 3) % 2 == 0
+        end,
+    }
+
+    local function applyMask(k2)
+        for y = 0, size - 1 do
+            for x = 0, size - 1 do
+                if not fn[y][x] and MASKS[k2 + 1](x, y) then
+                    m[y][x] = not m[y][x]
+                end
+            end
+        end
+    end
+    local function penalty()
+        local p = 0
+
+        for y = 0, size - 1 do
+            local run, last = 0, nil
+
+            for x = 0, size - 1 do
+                if m[y][x] == last then
+                    run += 1
+
+                    if run == 5 then
+                        p += 3
+                    elseif run > 5 then
+                        p += 1
+                    end
+                else
+                    last, run = m[y][x], 1
+                end
+            end
+        end
+        for x = 0, size - 1 do
+            local run, last = 0, nil
+
+            for y = 0, size - 1 do
+                if m[y][x] == last then
+                    run += 1
+
+                    if run == 5 then
+                        p += 3
+                    elseif run > 5 then
+                        p += 1
+                    end
+                else
+                    last, run = m[y][x], 1
+                end
+            end
+        end
+
+        local dark = 0
+
+        for y = 0, size - 1 do
+            for x = 0, size - 1 do
+                if m[y][x] then
+                    dark += 1
+                end
+                if x < size - 1 and y < size - 1 then
+                    local c = m[y][x]
+
+                    if m[y][x + 1] == c and m[y + 1][x] == c and m[y + 1][x + 1] == c then
+                        p += 3
+                    end
+                end
+            end
+        end
+
+        local k3 = math.ceil(math.abs(dark * 20 - size * size * 10) / (size * size)) - 1
+
+        return p + math.max(0, k3) * 10
+    end
+
+    local best, bestP = 0, math.huge
+
+    for k2 = 0, 7 do
+        applyMask(k2)
+        drawFormat(k2)
+
+        local p = penalty()
+
+        if p < bestP then
+            best, bestP = k2, p
+        end
+
+        applyMask(k2)
+    end
+
+    applyMask(best)
+    drawFormat(best)
+
+    return m, size
 end
 local function keyWindow(firstMessage)
     local result
@@ -778,19 +1220,11 @@ local function keyWindow(firstMessage)
 
     local list = box(premPage, '#16161a', 22, 196, CW, #PAYMENT_METHODS * 48, 12, '#222228')
     local note
+    local showQr
 
     local function copied(how)
         pcall(setclipboard, PREMIUM_URL)
-
-        local opened = openLink(PREMIUM_URL)
-
-        if opened then
-            note.Text = 'Opening your browser' .. (how and (', pick ' .. how) or '') .. '. The link is copied too.'
-        else
-            note.Text = 'Link copied. Paste it in your browser' .. (how and (' and pick ' .. how) or '') .. '.'
-        end
-
-        note.TextColor3 = hex('#4ade80')
+        showQr(how)
     end
 
     for i, m in PAYMENT_METHODS do
@@ -837,28 +1271,95 @@ local function keyWindow(firstMessage)
     rowIcon(tr, ICON.external, 15, '#ffffff', 2)
 
     note = text(premPage, 
-[[Open it in your browser to pay. Your key arrives right after.]], 11, '#8b8b97', 'Medium', 22, by + 52, CW, 14, Enum.TextXAlignment.Center)
+[[Opens a code to scan with your phone. Your key arrives right after paying.]], 11, '#8b8b97', 'Medium', 22, by + 52, CW, 14, Enum.TextXAlignment.Center)
     PREM_H = by + 52 + 14 + 20
 
     copyBtn.MouseButton1Click:Connect(function()
         copied(nil)
     end)
 
-    local function show(prem)
-        keyPage.Visible = not prem
-        premPage.Visible = prem
+    local qrPage = page()
 
-        local h = prem and PREM_H or KEY_H
+    qrPage.Visible = false
+
+    local qrBack = headerButton(qrPage, 10, ICON.arrowLeft, '#b4b4be')
+
+    text(qrPage, 'Scan to pay', 14, '#ededf0', 'Semi', 50, 20, W - 110, 20)
+    headerButton(qrPage, W - 44, ICON.x, '#8b8b97')
+    box(qrPage, '#1f1f24', 0, 59, W, 1)
+
+    local QR_BOX = 228
+    local qrCard = box(qrPage, '#ffffff', math.floor((W - QR_BOX) / 2), 80, QR_BOX, QR_BOX, 12)
+    local qrHow = text(qrPage, '', 13, '#ededf0', 'Semi', 22, 80 + QR_BOX + 16, CW, 18, Enum.TextXAlignment.Center)
+
+    text(qrPage, 'Point your phone camera at the code to open the store.', 12, '#9a9aa6', 'Medium', 22, 80 + QR_BOX + 38, CW, 16, Enum.TextXAlignment.Center)
+
+    local qrCopied = text(qrPage, 
+[[The link is also copied, paste it in a browser on this device.]], 11, '#4ade80', 'Medium', 22, 80 + QR_BOX + 60, CW, 14, Enum.TextXAlignment.Center)
+    local QR_H = 80 + QR_BOX + 60 + 14 + 22
+    local qrDrawn = false
+
+    local function drawQr()
+        if qrDrawn then
+            return
+        end
+
+        qrDrawn = true
+
+        local m, size = qrMatrix(PREMIUM_URL)
+
+        if not m then
+            return
+        end
+
+        local cell = math.floor((QR_BOX - 24) / size)
+        local off = math.floor((QR_BOX - cell * size) / 2)
+
+        for y = 0, size - 1 do
+            local x = 0
+
+            while x < size do
+                if m[y][x] then
+                    local x0 = x
+
+                    while x < size and m[y][x] do
+                        x += 1
+                    end
+
+                    box(qrCard, '#000000', off + x0 * cell, off + y * cell, (x - x0) * cell, cell)
+                else
+                    x += 1
+                end
+            end
+        end
+    end
+    local function show(which)
+        keyPage.Visible = which == 'key'
+        premPage.Visible = which == 'prem'
+        qrPage.Visible = which == 'qr'
+
+        local h = which == 'prem' and PREM_H or which == 'qr' and QR_H or KEY_H
 
         card.Size = UDim2.new(0, W, 0, h)
         scale.Scale = fitFor(h)
     end
 
+    showQr = function(how)
+        drawQr()
+
+        qrHow.Text = how and ('Pay with ' .. how) or 'One Hub Premium'
+
+        show('qr')
+    end
+
     skip.MouseButton1Click:Connect(function()
-        show(true)
+        show('prem')
     end)
     back.MouseButton1Click:Connect(function()
-        show(false)
+        show('key')
+    end)
+    qrBack.MouseButton1Click:Connect(function()
+        show('prem')
     end)
 
     local open = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)

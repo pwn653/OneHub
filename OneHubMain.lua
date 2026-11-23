@@ -148,6 +148,65 @@ local function saveKey(k)
     end)
 end
 
+local PREMIUM_FILE = 'OneHub/key_premium.txt'
+
+local function premiumSaved()
+    local k
+
+    pcall(function()
+        if isfile and isfile(PREMIUM_FILE) then
+            k = readfile(PREMIUM_FILE)
+        end
+    end)
+
+    return clean(k)
+end
+local function savePremium(k)
+    pcall(function()
+        if makefolder and not (isfolder and isfolder('OneHub')) then
+            makefolder('OneHub')
+        end
+
+        writefile(PREMIUM_FILE, k)
+    end)
+end
+local function forgetPremium()
+    pcall(function()
+        if isfile and isfile(PREMIUM_FILE) then
+            if delfile then
+                delfile(PREMIUM_FILE)
+            else
+                writefile(PREMIUM_FILE, '')
+            end
+        end
+    end)
+end
+local function premiumInfo(res)
+    local yes = false
+
+    pcall(function()
+        local d = type(res) == 'table' and res.data
+
+        if type(d) ~= 'table' then
+            return
+        end
+
+        local note = string.lower(tostring(d.note or d.Note or ''))
+
+        if string.find(note, 'premium', 1, true) then
+            yes = true
+        end
+
+        local exp = tonumber(d.auth_expire)
+
+        if exp and exp > 0 and exp - os.time() >= 48 * 3600 then
+            yes = true
+        end
+    end)
+
+    return yes
+end
+
 local luarmor
 
 local function checkKey(k)
@@ -187,7 +246,7 @@ local function checkKey(k)
     local code = res.code
 
     if code == 'KEY_VALID' then
-        return true
+        return true, nil, nil, res
     elseif code == 'KEY_HWID_LOCKED' then
         return false, 
 [[This key is locked to another device. In our Discord click Reset HWID and paste this key.]]
@@ -1406,7 +1465,7 @@ local function keyWindow(firstMessage)
 
         checkLook('busy')
 
-        local ok, why, sure = checkKey(k)
+        local ok, why, sure, res = checkKey(k)
 
         busy = false
 
@@ -1414,6 +1473,9 @@ local function keyWindow(firstMessage)
 
         resultVerified = ok
 
+        if ok and premiumInfo(res) then
+            savePremium(k)
+        end
         if not ok and sure == false then
             unsure += 1
 
@@ -1463,28 +1525,69 @@ if current.Key then
 
     local key, why, unchecked = nil, nil, nil
     local pasted = pastedKey()
+    local redeemed = false
 
-    if pasted then
-        local ok, w, sure = checkKey(pasted)
+    pcall(function()
+        redeemed = getgenv().OneHubRedeem == true
+        getgenv().OneHubRedeem = nil
+    end)
+
+    local function tryPremium()
+        local prem = premiumSaved()
+
+        if not prem or prem == key then
+            return
+        end
+
+        local ok, w, sure = checkKey(prem)
+
+        if ok then
+            key = prem
+        elseif sure == false then
+            unchecked = unchecked or prem
+        elseif tostring(w):find('another device', 1, true) then
+            notify(
+[[Your Premium key is locked to another device. Reset HWID in our Discord.]], 10)
+        else
+            forgetPremium()
+        end
+    end
+
+    if not redeemed then
+        tryPremium()
+    end
+    if pasted and not key then
+        local ok, w, sure, res = checkKey(pasted)
 
         if ok then
             key = pasted
+
+            if redeemed or premiumInfo(res) then
+                savePremium(pasted)
+            end
         elseif sure == false then
-            unchecked = pasted
+            unchecked = unchecked or pasted
         else
             why = w
 
             dropPasted()
         end
     end
+    if redeemed and not key then
+        tryPremium()
+    end
     if not key then
         local saved = savedKey()
 
         if saved then
-            local ok, w, sure = checkKey(saved)
+            local ok, w, sure, res = checkKey(saved)
 
             if ok then
                 key = saved
+
+                if premiumInfo(res) then
+                    savePremium(saved)
+                end
             elseif sure == false then
                 unchecked = unchecked or saved
             else

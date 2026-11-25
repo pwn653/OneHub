@@ -43,10 +43,16 @@ local GAMES = {
 	{
 		Name = "Anime Adventures",
 		Ids = { 8304191830 },
-		GameIds = { 3183403065 }, -- lobby and every match place
+		GameIds = { 3183403065 }, 
 		Url = "https://api.luarmor.net/files/v4/loaders/0e32aab72394d55f495ece8cc3f354d8.lua",
 		Key = true,
 	},
+    {
+      Name = "Rivals",
+      Ids = {6035872082},
+      Url = "https://api.luarmor.net/files/v4/loaders/95b6f44bf44499df72625dc5029d3918.lua",
+      Key = true,
+    },
 }
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/pwn653/OneHub/refs/heads/main/OneHubMain.lua"))(GAMES)

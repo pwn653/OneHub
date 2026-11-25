@@ -7,4 +7,5 @@ return {
 	{ Name = "Break & Steal Eggs", State = "working" },
 	{ Name = "Steal A Pet And Ride It", State = "working" },
 	{ Name = "Jujutsu Shenanigans", State = "working" },
+	{ Name = "Rivals", State = "working"},
 }

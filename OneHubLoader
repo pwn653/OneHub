@@ -49,7 +49,7 @@ local GAMES = {
 	},
     {
       Name = "Rivals",
-      Ids = {6035872082, 117398147513099},
+      Ids = {6035872082, 117398147513099, 17625359962},
       Url = "https://api.luarmor.net/files/v4/loaders/95b6f44bf44499df72625dc5029d3918.lua",
       Key = true,
     },

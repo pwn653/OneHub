@@ -1553,16 +1553,47 @@ if current.Key then
         end
     end
 
-    if not redeemed then
+    local redeemUnchecked = false
+
+    if redeemed and pasted then
+        -- "Redeem and reload": use the key that was just pasted, or say why not.
+        -- Never go back to the old saved key without telling the player.
+        local ok, w, sure
+
+        for _ = 1, 3 do
+            ok, w, sure = checkKey(pasted)
+
+            if ok or sure ~= false then
+                break
+            end
+
+            task.wait(2)
+        end
+
+        if ok then
+            key = pasted
+
+            savePremium(pasted)
+        elseif sure == false then
+            key = pasted
+            redeemUnchecked = true
+        else
+            why = w
+
+            dropPasted()
+            notify('Key not redeemed: ' .. tostring(w) .. ' Your old key is still used.', 10)
+        end
+    end
+    if not key then
         tryPremium()
     end
-    if pasted and not key then
+    if pasted and not key and not redeemed then
         local ok, w, sure, res = checkKey(pasted)
 
         if ok then
             key = pasted
 
-            if redeemed or premiumInfo(res) then
+            if premiumInfo(res) then
                 savePremium(pasted)
             end
         elseif sure == false then
@@ -1572,9 +1603,6 @@ if current.Key then
 
             dropPasted()
         end
-    end
-    if redeemed and not key then
-        tryPremium()
     end
     if not key then
         local saved = savedKey()
@@ -1600,6 +1628,11 @@ if current.Key then
 
     local verified = key ~= nil
     local keepSaved = false
+
+    if redeemUnchecked then
+        verified = false
+        keepSaved = true
+    end
 
     if not key and unchecked and not why then
         key = unchecked

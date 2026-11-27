@@ -1,7 +1,7 @@
 local DISCORD = 'https://discord.gg/yNTHZAJvMd'
 local PREMIUM_URL = 
 [[https://sub.onehub.lol]]
-local PREMIUM_PRICE = '$1.49'
+local PREMIUM_PRICE = '$1.98'
 local PAYMENT_METHODS = {
     {
         Badge = 'PP',

@@ -1,6 +1,6 @@
 local DISCORD = 'https://discord.gg/yNTHZAJvMd'
 local PREMIUM_URL = 
-[[https://onehub-script.mysellauth.com/product/one-hub-7-days-key-premium]]
+[[https://sub.onehub.lol/?plan=weekly]]
 local PREMIUM_PRICE = '$1.98'
 local PAYMENT_METHODS = {
     {
